@@ -119,12 +119,11 @@ def get_payment_metrics(
 
 # PERFORMANCE
 
-def get_performance_metrics(
+def _fetch_submitted_performance_records(
     school_id: str,
     session_term_id: int,
     student_id: Optional[str] = None
 ):
-
     query = (
         supabase
         .table("student_term_results")
@@ -137,17 +136,35 @@ def get_performance_metrics(
         query = query.eq("student_id", student_id)
 
     response = query.execute()
-    data = response.data or []
+    return response.data or []
 
-    if not data:
-        return {"average_score": None}
+
+def get_performance_metrics(
+    school_id: str,
+    session_term_id: int,
+    student_id: Optional[str] = None
+):
+    records = _fetch_submitted_performance_records(
+        school_id,
+        session_term_id,
+        student_id
+    )
+
+    records_submitted = len(records)
+
+    if records_submitted == 0:
+        return {
+            "average_score": None,
+            "records_submitted": 0
+        }
 
     avg = sum(
         r.get("average_score", 0)
-        for r in data
-    ) / len(data)
+        for r in records
+    ) / records_submitted
 
     return {
-        "average_score": round(avg, 2)
+        "average_score": round(avg, 2),
+        "records_submitted": records_submitted
     }
 

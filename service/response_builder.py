@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional
 from service.period_models import ResolvedPeriod
-from main import AskResponse  
+from service.models import AskResponse
 
 
 def build_response(
@@ -10,7 +10,8 @@ def build_response(
     supporting_metrics: Dict,
     role: str,
     period: ResolvedPeriod,
-    school_id: str,
+    intent: str,
+    student_id: Optional[str],
     data_gaps: Optional[str] = None,
     suggested_actions: Optional[List[str]] = None,
 ):
@@ -20,11 +21,11 @@ def build_response(
         data_gaps=data_gaps,
         suggested_actions=suggested_actions or [],
         data_scope_used={
-            "school_id": school_id,
+            "module": intent,
             "role": role,
-            "period_id": period.id,
-            "period_label": period.label,
+            "period": period.label,
             "period_type": period.type,
+            "scope": "child-level" if student_id else "school-level",
         },
         timestamp=datetime.utcnow(),
     )

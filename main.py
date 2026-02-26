@@ -111,8 +111,9 @@ def ask_tespire_ai(payload: AskRequest):
             suggested_actions=result.suggested_actions,
             role=role,
             period=resolved_period,
-            school_id=payload.context.school_id,
-        )
+            intent=intent,
+            student_id=payload.context.student_id,
+            )
 
         response_text = final_response.answer
 
@@ -137,8 +138,9 @@ def ask_tespire_ai(payload: AskRequest):
             suggested_actions=["Please try again later"],
             role=safe_role,
             period=safe_period,
-            school_id=payload.context.school_id,
-              )
+            intent="system",
+            student_id=None,
+            )
         
         response_text = final_response.answer
 
