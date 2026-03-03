@@ -2,27 +2,31 @@ from service.metrics import get_payment_metrics
 from service.intents.types import IntentResult
 from service.period_models import ResolvedPeriod
 from service.intents.scope import AccessScope
+from service.derivations import compute_outstanding_amount
 
 
 def handle_fees(scope: AccessScope, period: ResolvedPeriod) -> IntentResult:
 
     metrics = get_payment_metrics(
         school_id=scope.school_id,
-        student_id=scope.student_id,
-        session_term_id=period.id
+        session_term_id=period.id,
+        student_id=scope.student_id
     )
 
-    total_due = metrics.get("total_due")
-    total_paid = metrics.get("total_paid")
-    outstanding = metrics.get("outstanding")
+    records_found = metrics.get("records_found", 0)
 
-    if total_due is None:
+    if records_found == 0:
         return IntentResult(
-            answer="Verified data is unavailable or incomplete for this request.",
+            answer="Verified fee data is unavailable for this period.",
             supporting_metrics={},
-            data_gaps="No fee records found for the selected period.",
-            suggested_actions=["Verify fee data source"]
+            data_gaps="No payment records found.",
+            suggested_actions=["Verify fee management system"]
         )
+
+    total_due = metrics.get("total_due", 0)
+    total_paid = metrics.get("total_paid", 0)
+
+    outstanding = compute_outstanding_amount(total_due, total_paid)
 
     if scope.student_id:
         answer = (
@@ -37,7 +41,12 @@ def handle_fees(scope: AccessScope, period: ResolvedPeriod) -> IntentResult:
 
     return IntentResult(
         answer=answer,
-        supporting_metrics=metrics,
+        supporting_metrics={
+            "total_due": total_due,
+            "total_paid": total_paid,
+            "outstanding_amount": outstanding,
+            "records_found": records_found
+        },
         data_gaps=None,
         suggested_actions=[]
     )

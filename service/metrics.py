@@ -1,13 +1,10 @@
-from service.database import supabase
 from typing import Optional
-
+from service.database import supabase
+from service.derivations import compute_average, compute_high_low
 
 # ENROLLMENT
 
-def get_enrollment_metrics(
-    school_id: str
-):
-
+def get_enrollment_metrics(school_id: str):
     response = (
         supabase
         .table("students")
@@ -21,18 +18,12 @@ def get_enrollment_metrics(
     total_students = len(data)
     active_students = len(
         [s for s in data if s.get("status") == "enrolled"]
-    )
-
-    enrollment_rate = (
-        active_students / total_students
-        if total_students > 0 else 0
-    )
-
+        )
     return {
         "total_students": total_students,
-        "active_students": active_students,
-        "enrollment_rate": round(enrollment_rate, 2)
+        "active_students": active_students
     }
+
 
 # ATTENDANCE
 
@@ -55,19 +46,19 @@ def get_attendance_metrics(
 
     response = query.execute()
     data = response.data or []
-
-    if not data:
-        return {"attendance_rate": None}
-
+    
     present_count = len(
         [r for r in data if r.get("present") is True]
-    )
+        )
 
-    attendance_rate = present_count / len(data)
+    total_sessions = len(data)
 
+    
     return {
-        "attendance_rate": round(attendance_rate, 2)
+        "present_count": present_count,
+        "total_sessions": total_sessions
     }
+
 
 
 # PAYMENTS
@@ -91,31 +82,24 @@ def get_payment_metrics(
 
     response = query.execute()
     data = response.data or []
-
-    if not data:
-        return {
-            "total_due": 0,
-            "total_paid": 0,
-            "outstanding": 0
-        }
-
+    
     total_due = sum(
-        r.get("amount", 0) for r in data
-    )
-
+        r.get("amount") or 0
+        for r in data
+        )
+    
     total_paid = sum(
-        r.get("amount", 0)
+        (r.get("amount") or 0)
         for r in data
         if r.get("paid") is True
-    )
-
-    outstanding = total_due - total_paid
-
+        )
+    
     return {
         "total_due": total_due,
         "total_paid": total_paid,
-        "outstanding": outstanding
-    }
+        "records_found": len(data)
+        }
+
 
 # PERFORMANCE
 
@@ -144,27 +128,41 @@ def get_performance_metrics(
     session_term_id: int,
     student_id: Optional[str] = None
 ):
+
     records = _fetch_submitted_performance_records(
         school_id,
         session_term_id,
         student_id
     )
 
-    records_submitted = len(records)
-
-    if records_submitted == 0:
+    if not records:
         return {
             "average_score": None,
-            "records_submitted": 0
+            "records_used": 0,
+            "highest_score": None,
+            "lowest_score": None
         }
 
-    avg = sum(
-        r.get("average_score", 0)
+    scores = [
+        r.get("average_score")
         for r in records
-    ) / records_submitted
+        if r.get("average_score") is not None
+    ]
+
+    if not scores:
+        return {
+            "average_score": None,
+            "records_used": 0,
+            "highest_score": None,
+            "lowest_score": None
+        }
+
+    average_score = compute_average(scores)
+    high_low = compute_high_low(scores)
 
     return {
-        "average_score": round(avg, 2),
-        "records_submitted": records_submitted
+        "average_score": average_score,
+        "records_used": len(scores),
+        "highest_score": high_low["highest"],
+        "lowest_score": high_low["lowest"]
     }
-

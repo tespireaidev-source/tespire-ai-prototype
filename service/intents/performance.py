@@ -8,37 +8,45 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
 
     metrics = get_performance_metrics(
         school_id=scope.school_id,
-        student_id=scope.student_id,
-        session_term_id=period.id
+        session_term_id=period.id,
+        student_id=scope.student_id
     )
 
     average_score = metrics.get("average_score")
-    records_submitted = metrics.get("records_submitted", 0)
+    records_used = metrics.get("records_used", 0)
+    highest = metrics.get("highest_score")
+    lowest = metrics.get("lowest_score")
 
+    # Guardrail
     if average_score is None:
         return IntentResult(
-            answer="Verified data is unavailable or incomplete for this request.",
+            answer="Verified performance data is unavailable for this period.",
             supporting_metrics={},
-            data_gaps="No performance records submitted for the selected period.",
+            data_gaps="No academic results submitted.",
             suggested_actions=["Verify academic performance data source"]
-            )
+        )
 
     if scope.student_id:
         answer = (
             f"Your child's average performance score for {period.label} "
-            f"is {average_score}. "
-            f"Based on {records_submitted} submitted record(s)."
-            )
+            f"is {average_score}%. "
+            f"Based on {records_used} submitted record(s)."
+        )
     else:
         answer = (
             f"The overall average performance score for {period.label} "
-            f"is {average_score}. "
-            f"Based on {records_submitted} submitted record(s)."
-            )
+            f"is {average_score}%. "
+            f"Based on {records_used} submitted record(s)."
+        )
 
     return IntentResult(
         answer=answer,
-        supporting_metrics=metrics,
+        supporting_metrics={
+            "average_score": average_score,
+            "records_used": records_used,
+            "highest_score": highest,
+            "lowest_score": lowest
+        },
         data_gaps=None,
         suggested_actions=[]
     )
