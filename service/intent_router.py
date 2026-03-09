@@ -1,17 +1,21 @@
 from service.intents.enrollment import handle_enrollment
 from service.intents.attendance import handle_attendance
-from service.intents.fees import handle_fees
+from service.intents.payments import handle_payments
 from service.intents.performance import handle_performance
 from service.intents.types import IntentResult
 from service.intents.access import INTENT_ACCESS
 from service.intents.child_scope import resolve_child_scope
+from service.period_models import ResolvedPeriod
 
 
-def route_intent(intent: str, context, period: int) -> IntentResult:
-    role = context.role
+def route_intent(intent: str, context, period: ResolvedPeriod) -> IntentResult:
 
     
+    role = (context.role or "").lower()
+    intent = (intent or "").lower()
+
     allowed_roles = INTENT_ACCESS.get(intent)
+
     if not allowed_roles:
         return IntentResult(
             answer="I don't understand this question yet.",
@@ -20,7 +24,6 @@ def route_intent(intent: str, context, period: int) -> IntentResult:
             suggested_actions=["Try rephrasing your question"]
         )
 
-    
     if role not in allowed_roles:
         return IntentResult(
             answer="You do not have permission to access this information.",
@@ -29,7 +32,6 @@ def route_intent(intent: str, context, period: int) -> IntentResult:
             suggested_actions=[]
         )
 
-    
     scope = resolve_child_scope(context)
 
     if not scope.school_id:
@@ -43,10 +45,13 @@ def route_intent(intent: str, context, period: int) -> IntentResult:
     
     if intent == "enrollment":
         return handle_enrollment(scope, period)
+
     if intent == "attendance":
         return handle_attendance(scope, period)
-    if intent == "fees":
-        return handle_fees(scope, period)
+
+    if intent == "payments":
+        return handle_payments(scope, period)
+
     if intent == "performance":
         return handle_performance(scope, period)
 

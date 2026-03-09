@@ -25,7 +25,7 @@ def get_follow_up_prompts(
 
         prompts.append("Compare attendance with last term.")
 
-    elif intent == "fees":
+    elif intent == "payments":
         outstanding = (
             supporting_metrics.get("outstanding")
             or supporting_metrics.get("outstanding_amount")
@@ -35,7 +35,7 @@ def get_follow_up_prompts(
         if outstanding > 0:
             prompts.append("Which students have the highest outstanding fees?")
 
-        prompts.append("Compare fee collection with last term.")
+        prompts.append("Compare payments collection with last term.")
 
     elif intent == "performance":
         prompts.append("Show highest and lowest performing students.")

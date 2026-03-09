@@ -49,8 +49,8 @@ def infer_risks_and_trends(
                     "Average performance is strong (75% or higher)."
                 )
 
-    # Fees
-    elif intent == "fees":
+    # payments
+    elif intent == "payments":
         outstanding = supporting_metrics.get("outstanding_amount")
 
         if outstanding is None:
@@ -58,7 +58,7 @@ def infer_risks_and_trends(
 
         if outstanding is not None and outstanding > 0:
             insights.append(
-                "There are outstanding fees that may require follow-up."
+                "There are outstanding payments that may require follow-up."
             )
 
     return insights

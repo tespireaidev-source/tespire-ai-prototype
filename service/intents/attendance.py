@@ -6,6 +6,9 @@ from service.derivations import compute_attendance_rate
 
 
 def handle_attendance(scope: AccessScope, period: ResolvedPeriod) -> IntentResult:
+     
+    print("DEBUG SCHOOL:", scope.school_id)
+    print("DEBUG PERIOD ID:", period.id)
 
     metrics = get_attendance_metrics(
         school_id=scope.school_id,
@@ -16,7 +19,6 @@ def handle_attendance(scope: AccessScope, period: ResolvedPeriod) -> IntentResul
     present = metrics.get("present_count", 0)
     total = metrics.get("total_sessions", 0)
 
-    # Guardrail: No data
     if total == 0:
         return IntentResult(
             answer="Verified attendance data is unavailable for this period.",

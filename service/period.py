@@ -13,8 +13,9 @@ def resolve_period(
     if period_input in [None, "current"]:
 
         record = (
-            supabase.table("session_terms")
-            .select("*")
+            supabase
+            .table("session_terms")
+            .select("id, session_id, term_id")
             .eq("school_id", school_id)
             .eq("is_current", True)
             .limit(1)
@@ -31,6 +32,8 @@ def resolve_period(
 
         return ResolvedPeriod(
             id=row["id"],
+            session_id=row["session_id"],
+            term_id=row["term_id"],
             label=f"Session {row['session_id']} - Term {row['term_id']}",
             period_type="current"
         )
@@ -39,10 +42,11 @@ def resolve_period(
     if str(period_input).isdigit():
 
         record = (
-            supabase.table("session_terms")
-            .select("*")
-            .eq("id", int(period_input))
+            supabase
+            .table("session_terms")
+            .select("id, session_id, term_id")
             .eq("school_id", school_id)
+            .eq("id", int(period_input))
             .limit(1)
             .execute()
         )
@@ -57,7 +61,9 @@ def resolve_period(
 
         return ResolvedPeriod(
             id=row["id"],
-            label=row.get("name") or f"Session {row['session_id']} - Term {row['term_id']}",
+            session_id=row["session_id"],
+            term_id=row["term_id"],
+            label=f"Session {row['session_id']} - Term {row['term_id']}",
             period_type="explicit"
         )
 

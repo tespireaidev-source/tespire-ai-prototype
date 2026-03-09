@@ -25,7 +25,7 @@ def get_drilldown_options(intent: str, scope_level: str) -> List[str]:
         else:
             options.append("Drill down into subject performance breakdown.")
 
-    elif intent == "fees":
+    elif intent == "payments":
         if scope_level == "school-level":
             options.append("Drill down into class-level fee breakdown.")
         else:

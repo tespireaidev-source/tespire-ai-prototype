@@ -18,22 +18,21 @@ def handle_enrollment(scope: AccessScope, period: ResolvedPeriod) -> IntentResul
         return IntentResult(
             answer="Verified enrollment data is unavailable.",
             supporting_metrics={},
-            data_gaps="No enrollment records found.",
+            data_gaps="No student records found.",
             suggested_actions=["Verify student registration data source"]
         )
 
-    
     enrollment_rate = compute_enrollment_rate(total, active)
 
     if scope.student_id:
         answer = (
-            f"Your child is enrolled for {period.label}. "
-            f"The school enrollment rate is {enrollment_rate}%."
+            f"Your child is enrolled. "
+            f"The school's enrollment rate is {enrollment_rate}%."
         )
     else:
         answer = (
-            f"Total enrolled students: {active} out of {total}. "
-            f"Enrollment rate is {enrollment_rate}%."
+            f"There are {active} active students out of {total}. "
+            f"The enrollment rate is {enrollment_rate}%."
         )
 
     return IntentResult(
@@ -46,4 +45,3 @@ def handle_enrollment(scope: AccessScope, period: ResolvedPeriod) -> IntentResul
         data_gaps=None,
         suggested_actions=[]
     )
-
