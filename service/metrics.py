@@ -13,11 +13,11 @@ def get_enrollment_metrics(school_id: int):
         supabase
         .table("students")
         .select("status")
-        .eq("school_id", school_id)
+        .eq("tenant_id", school_id)
         .execute()
     )
 
-    data = response.data or []
+    data = response.data if response.data else []
 
     total_students = len(data)
 
@@ -39,16 +39,18 @@ def get_enrollment_metrics(school_id: int):
 
 def get_attendance_metrics(
     school_id: int,
-    session_term_id: int,
+    session_id: str,
+    term_id: str,
     student_id: Optional[str] = None
 ):
 
     query = (
         supabase
         .table("attendances")
-        .select("present")
-        .eq("school_id", school_id)
-        .eq("session_term_id", session_term_id)
+        .select("status")
+        .eq("tenant_id", school_id)
+        .eq("session_id", session_id)
+        .eq("term_id", term_id)
     )
 
     if student_id:
@@ -56,11 +58,11 @@ def get_attendance_metrics(
 
     response = query.execute()
 
-    data = response.data or []
+    data = response.data if response.data else []
 
     present_count = len([
         r for r in data
-        if r.get("present") is True
+        if (r.get("status") or "").lower() == "present"
     ])
 
     total_sessions = len(data)
@@ -73,11 +75,11 @@ def get_attendance_metrics(
 
 
 
-# PAYMENTS 
+# PAYMENTS
 
 def get_payment_metrics(
     school_id: int,
-    session_id: int,
+    session_id: str,
     student_id: Optional[str] = None
 ):
 
@@ -85,7 +87,7 @@ def get_payment_metrics(
         supabase
         .table("invoices")
         .select("amount, status")
-        .eq("school_id", school_id)
+        .eq("tenant_id", school_id)
         .eq("session_id", session_id)
         .eq("owner_type", "student")
     )
@@ -95,7 +97,7 @@ def get_payment_metrics(
 
     response = query.execute()
 
-    data = response.data or []
+    data = response.data if response.data else []
 
     total_due = sum(
         (inv.get("amount") or 0)
@@ -118,12 +120,13 @@ def get_payment_metrics(
     }
 
 
+
 # PERFORMANCE
 
 def _fetch_submitted_performance_records(
     school_id: int,
-    session_id: int,
-    term_id: int,
+    session_id: str,
+    term_id: str,
     student_id: Optional[str] = None
 ):
 
@@ -131,7 +134,7 @@ def _fetch_submitted_performance_records(
         supabase
         .table("student_term_results")
         .select("average_total")
-        .eq("school_id", school_id)
+        .eq("tenant_id", school_id)   # FIXED
         .eq("session_id", session_id)
         .eq("term_id", term_id)
     )
@@ -141,13 +144,13 @@ def _fetch_submitted_performance_records(
 
     response = query.execute()
 
-    return response.data or []
+    return response.data if response.data else []
 
 
 def get_performance_metrics(
     school_id: int,
-    session_id: int,
-    term_id: int,
+    session_id: str,
+    term_id: str,
     student_id: Optional[str] = None
 ):
 
@@ -189,3 +192,46 @@ def get_performance_metrics(
         "highest_score": high_low["highest"],
         "lowest_score": high_low["lowest"]
     }
+
+
+
+# PREVIOUS TERM PERFORMANCE
+
+
+def get_previous_term_performance(
+    school_id: int,
+    session_id: str,
+    term_id: str
+):
+
+    try:
+        previous_term = str(int(term_id) - 1)
+    except ValueError:
+        return None
+
+    if int(previous_term) < 1:
+        return None
+
+    query = (
+        supabase
+        .table("student_term_results")
+        .select("average_total")
+        .eq("tenant_id", school_id)   
+        .eq("session_id", session_id)
+        .eq("term_id", previous_term)
+    )
+
+    response = query.execute()
+
+    data = response.data if response.data else []
+
+    scores = [
+        r.get("average_total")
+        for r in data
+        if r.get("average_total") is not None
+    ]
+
+    if not scores:
+        return None
+
+    return compute_average(scores)

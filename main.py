@@ -13,14 +13,13 @@ from service.response_builder import build_response
 from service.period_guard import enforce_period
 from service.logging_hook import log_ai_interaction
 
+from service.reports.monthly_snapshot import generate_monthly_snapshot
+from service.reports.term_academic_report import generate_term_academic_report
 
 
 logger = logging.getLogger(__name__)
 
-
-
 app = FastAPI(title="Tespire AI Prototype")
-
 
 
 class AskContext(BaseModel):
@@ -34,7 +33,6 @@ class AskRequest(BaseModel):
     question: str
     period: Optional[str] = None
     context: AskContext
-
 
 
 ALLOWED_ROLES = ["owner", "admin", "teacher", "parent"]
@@ -52,14 +50,14 @@ def role_guard(role: str) -> str:
     return role
 
 
-
 @app.get("/")
 def root():
     return {"message": "Tespire AI backend is running"}
 
 
 
-# AI ENDPOINT
+# AI QUERY ENDPOINT
+
 
 @app.post("/ask")
 def ask_tespire_ai(payload: AskRequest):
@@ -72,33 +70,26 @@ def ask_tespire_ai(payload: AskRequest):
 
     try:
 
-        
         role = role_guard(payload.context.role)
 
         school_id = payload.context.school_id
 
-        
         resolved_period = resolve_period(
             school_id=school_id,
             period_input=payload.period
         )
 
-        
         resolved_period = enforce_period(role, resolved_period)
 
-
         # Parent Guardrail
-        
         if role == "parent" and not payload.context.student_id:
             raise HTTPException(
                 status_code=400,
                 detail="Parent requests must include student_id"
             )
 
-        
         history = get_history(payload.context.session_id)
 
-        
         intent = llm_reason(
             payload.question,
             context=payload.context.dict(),
@@ -120,14 +111,12 @@ def ask_tespire_ai(payload: AskRequest):
         if intent not in allowed_intents:
             intent = "unknown"
 
-       
         result = route_intent(
             intent=intent,
             context=payload.context,
             period=resolved_period
         )
 
-        
         save_turn(
             payload.context.session_id,
             payload.question,
@@ -135,7 +124,6 @@ def ask_tespire_ai(payload: AskRequest):
             intent
         )
 
-        
         final_response = build_response(
             answer=result.answer,
             supporting_metrics=result.supporting_metrics,
@@ -151,13 +139,14 @@ def ask_tespire_ai(payload: AskRequest):
 
         return final_response
 
-    
+
     except HTTPException:
         success = False
         raise
 
-    
+
     except Exception:
+
         success = False
 
         logger.exception("Unexpected AI service failure")
@@ -185,8 +174,6 @@ def ask_tespire_ai(payload: AskRequest):
 
         return final_response
 
-    
-
 
     finally:
 
@@ -206,3 +193,48 @@ def ask_tespire_ai(payload: AskRequest):
             success=success,
             execution_time_ms=execution_time_ms
         )
+
+
+
+# MONTHLY SNAPSHOT REPORT
+
+@app.get("/reports/monthly")
+def get_monthly_snapshot(
+    school_id: int,
+    session_id: str,
+    term_id: str
+):
+
+    snapshot = generate_monthly_snapshot(
+        school_id=school_id,
+        session_id=session_id,
+        term_id=term_id
+    )
+
+    return {
+        "report": "Monthly Operational Snapshot",
+        "period": f"Session {session_id} - Term {term_id}",
+        "snapshot": snapshot
+    }
+
+#TERM ACADEMIC REPORTS
+
+@app.get("/reports/term-academic")
+
+def get_term_academic_report(
+    school_id: int,
+    session_id: str,
+    term_id: str
+):
+
+    report = generate_term_academic_report(
+        school_id,
+        session_id,
+        term_id
+    )
+
+    return {
+        "report": "End-of-Term Academic Report",
+        "period": f"Session {session_id} - Term {term_id}",
+        "data": report
+    }

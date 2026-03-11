@@ -9,15 +9,15 @@ def resolve_period(
     period_input: Optional[str]
 ) -> ResolvedPeriod:
 
-    
+    # CURRENT PERIOD
     if period_input in [None, "current"]:
 
         record = (
             supabase
             .table("session_terms")
             .select("id, session_id, term_id")
-            .eq("school_id", school_id)
-            .eq("is_current", True)
+            .eq("tenant_id", school_id)
+            .eq("is_active", 1)
             .limit(1)
             .execute()
         )
@@ -38,14 +38,14 @@ def resolve_period(
             period_type="current"
         )
 
-    
+    # EXPLICIT PERIOD
     if str(period_input).isdigit():
 
         record = (
             supabase
             .table("session_terms")
             .select("id, session_id, term_id")
-            .eq("school_id", school_id)
+            .eq("tenant_id", school_id)
             .eq("id", int(period_input))
             .limit(1)
             .execute()
@@ -67,7 +67,6 @@ def resolve_period(
             period_type="explicit"
         )
 
-    
     raise HTTPException(
         status_code=400,
         detail="Unsupported period format."
