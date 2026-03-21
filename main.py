@@ -12,9 +12,14 @@ from service.intent_router import route_intent
 from service.response_builder import build_response
 from service.period_guard import enforce_period
 from service.logging_hook import log_ai_interaction
+from service.drilldown_executor import get_top_students, get_lowest_students
+from service.ai_access_control import is_ai_enabled_for_role
+from service.guardrail_filter import evaluate_guardrails
 
 from service.reports.monthly_snapshot import generate_monthly_snapshot
 from service.reports.term_academic_report import generate_term_academic_report
+from service.reports.report_history import get_report_history
+from service.report_guard import enforce_report_access
 
 
 logger = logging.getLogger(__name__)
@@ -73,6 +78,13 @@ def ask_tespire_ai(payload: AskRequest):
         role = role_guard(payload.context.role)
 
         school_id = payload.context.school_id
+        # AI role access control
+        if not is_ai_enabled_for_role(school_id, role):
+            raise HTTPException(
+                status_code=403,
+                detail="AI access is currently disabled for this role."
+            )
+       
 
         resolved_period = resolve_period(
             school_id=school_id,
@@ -87,6 +99,21 @@ def ask_tespire_ai(payload: AskRequest):
                 status_code=400,
                 detail="Parent requests must include student_id"
             )
+        
+        # GUARDRAIL FILTER
+        guardrail_message = evaluate_guardrails(payload.question)
+
+        if guardrail_message:
+          return build_response(
+              answer=guardrail_message,
+              supporting_metrics={},
+              data_gaps=None,
+              suggested_actions=[],
+              role=role,
+              period=resolved_period,
+              intent="guardrail",
+              student_id=payload.context.student_id,
+           )
 
         history = get_history(payload.context.session_id)
 
@@ -200,37 +227,56 @@ def ask_tespire_ai(payload: AskRequest):
 
 @app.get("/reports/monthly")
 def get_monthly_snapshot(
+    role: str,
     school_id: int,
     session_id: str,
     term_id: str
 ):
+
+    role = role_guard(role)
+
+    enforce_report_access(role, "monthly_snapshot")
 
     snapshot = generate_monthly_snapshot(
         school_id=school_id,
         session_id=session_id,
         term_id=term_id
     )
+    term_clean =str(term_id).lower().replace("term", "").strip()
 
     return {
         "report": "Monthly Operational Snapshot",
-        "period": f"Session {session_id} - Term {term_id}",
+        "period": f"Session {session_id} - Term {term_clean}",
         "snapshot": snapshot
     }
 
-#TERM ACADEMIC REPORTS
+# TERM ACADEMIC REPORTS
 
 @app.get("/reports/term-academic")
-
 def get_term_academic_report(
+    role: str,
     school_id: int,
     session_id: str,
-    term_id: str
+    term_id: str,
+    student_id: Optional[str] = None
 ):
+
+    role = role_guard(role)
+
+    enforce_report_access(role, "term_academic")
+
+    # Parent must provide student_id
+    if role == "parent" and not student_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Parents must provide student_id"
+        )
 
     report = generate_term_academic_report(
         school_id,
         session_id,
-        term_id
+        term_id,
+        student_id
     )
 
     return {
@@ -238,3 +284,68 @@ def get_term_academic_report(
         "period": f"Session {session_id} - Term {term_id}",
         "data": report
     }
+
+# REPORT HISTORY
+
+@app.get("/reports/history")
+def get_reports_history(
+    role: str,
+    school_id: int
+):
+
+    role = role_guard(role)
+
+    # same visibility as academic reports
+    enforce_report_access(role, "term_academic")
+
+    history = get_report_history(school_id)
+
+    return {
+        "report": "Available Report History",
+        "school_id": school_id,
+        "reports": history
+    }
+
+
+# DRILLDOWN EXECUTOR
+@app.post("/drilldown")
+def drilldown(
+    role: str,
+    type: str,
+    school_id: int,
+    session_id: str,
+    term_id: str
+):
+
+    role = role_guard(role)
+
+    if type == "top_students":
+
+        data = get_top_students(
+            school_id,
+            session_id,
+            term_id
+        )
+
+        return {
+            "drilldown": "Top Performing Students",
+            "data": data
+        }
+
+    if type == "lowest_students":
+
+        data = get_lowest_students(
+            school_id,
+            session_id,
+            term_id
+        )
+
+        return {
+            "drilldown": "Lowest Performing Students",
+            "data": data
+        }
+
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid drilldown type. use 'top_students' or 'lowest_students'."
+    )

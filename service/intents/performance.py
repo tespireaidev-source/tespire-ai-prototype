@@ -4,6 +4,8 @@ from service.period_models import ResolvedPeriod
 from service.intents.scope import AccessScope
 from service.student_utils import get_student_full_name
 from service.trend_utils import compute_trend
+from service.data_completeness import check_data_completeness
+from service.expected_records import get_expected_performance_records
 
 
 def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResult:
@@ -32,6 +34,21 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
             suggested_actions=["Verify academic performance data source"]
         )
 
+    # DATA COMPLETENESS CHECK 
+    expected_records = get_expected_performance_records(
+       scope.school_id,
+       period.session_id,
+       period.term_id
+    )
+
+    completeness = check_data_completeness(records, expected_records)
+
+    data_gap_message = None
+
+    if completeness and completeness["status"] == "incomplete":
+        data_gap_message = completeness["message"]
+
+    # TREND ANALYSIS 
     previous_avg = get_previous_term_performance(
         scope.school_id,
         period.session_id,
@@ -50,7 +67,7 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
         else:
             trend_text = " Performance remained stable compared to the previous term."
 
-    # Child-level response
+    # CHILD LEVEL RESPONSE 
     if scope.student_id:
 
         student_name = get_student_full_name(scope.student_id)
@@ -66,7 +83,7 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
                 f"is {avg}% based on {records} academic records.{trend_text}"
             )
 
-    # School-level response
+    # SCHOOL LEVEL RESPONSE
     else:
         answer = (
             f"The overall average performance score for {period.label} "
@@ -82,6 +99,6 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
             "scope": "student-level" if scope.student_id else "school-level",
             "records_analysed": records
         },
-        data_gaps=None,
+        data_gaps=data_gap_message,
         suggested_actions=[]
     )
