@@ -27,7 +27,6 @@ The system processes user questions, determines intent, fetches relevant data fr
 
 ## Architecture
 
-``
 User -> FastAPI -> Intent Router -> Metrics/Reports -> Supabase -> Response Builder -> Response 
 
 
@@ -45,20 +44,20 @@ User -> FastAPI -> Intent Router -> Metrics/Reports -> Supabase -> Response Buil
 
 ### 1. Clone the repository
 
-
-git clone <repo-url>
+```bash
+git clone https://github.com/tespireaidev-source/tespire-ai-prototype.git
 cd tespire-ai-prototype
-
+```
 
 ### 2. Install dependencies
 
-
+```bash
 pip install -r requirements.txt
-
+```
 
 ### 3. Configure environment variables
 
-Create a `.env` file:
+Create a `.env` file based on `.env.example`:
 
 
 SUPABASE_URL=your_url
@@ -69,9 +68,9 @@ SUPABASE_JWT_SECRET=your_jwt_secret
 
 ### 4. Run the server
 
-
+```bash
 uvicorn main:app --reload
-
+```
 
 
 ## Authentication
@@ -169,7 +168,12 @@ Params:
 2. Set environment variables
 3. Start command:
 
-
+```bash
 uvicorn main:app --host 0.0.0.0 --port 10000
+```
 
+## Handover Note
 
+This system is delivered as a production-grade prototype with security, performance optimization, and data integrity mechanisms in place. 
+
+It is designed for current scale and can be extended for full production deployment.
