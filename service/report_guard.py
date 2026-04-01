@@ -5,7 +5,7 @@ def enforce_report_access(role: str, report_type: str):
 
     role = role.lower()
 
-    # Operational report
+    # Monthly operational report
     if report_type == "monthly_snapshot":
 
         if role not in ["owner", "admin"]:

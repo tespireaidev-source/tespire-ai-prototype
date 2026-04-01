@@ -52,7 +52,7 @@ def build_response(
 
     return AskResponse(
         answer=answer,
-        supporting_metrics=supporting_metrics,
+        supporting_metrics=supporting_metrics or {},
         data_gaps=data_gaps,
         suggested_actions=suggested_actions or [],
         data_scope_used={

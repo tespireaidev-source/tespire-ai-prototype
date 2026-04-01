@@ -1,13 +1,27 @@
 from typing import Optional
+import logging
+
 from service.database import supabase
 from service.derivations import compute_average, compute_high_low
+from service.cache import get_cache, set_cache
 
+
+logger = logging.getLogger(__name__)
 
 
 # ENROLLMENT
 
 
 def get_enrollment_metrics(school_id: int):
+
+    cache_key = f"enrollment:{school_id}"
+
+    cached = get_cache(cache_key)
+    if cached is not None:
+        logger.info("CACHE HIT: enrollment")
+        return cached
+
+    logger.info("CACHE MISS: enrollment")
 
     response = (
         supabase
@@ -26,12 +40,15 @@ def get_enrollment_metrics(school_id: int):
         if (s.get("status") or "").lower() == "active"
     ])
 
-    return {
+    result = {
         "total_students": total_students,
         "active_students": active_students,
         "records_found": len(data)
     }
 
+    set_cache(cache_key, result)
+
+    return result
 
 
 # ATTENDANCE
@@ -43,6 +60,16 @@ def get_attendance_metrics(
     term_id: str,
     student_id: Optional[str] = None
 ):
+
+    student_part = student_id or "all"
+    cache_key = f"attendance:{school_id}:{session_id}:{term_id}:{student_part}"
+
+    cached = get_cache(cache_key)
+    if cached is not None:
+        logger.info("CACHE HIT: attendance")
+        return cached
+
+    logger.info("CACHE MISS: attendance")
 
     query = (
         supabase
@@ -67,21 +94,35 @@ def get_attendance_metrics(
 
     total_sessions = len(data)
 
-    return {
+    result = {
         "present_count": present_count,
         "total_sessions": total_sessions,
         "records_found": len(data)
     }
 
+    set_cache(cache_key, result)
+
+    return result
 
 
 # PAYMENTS
+
 
 def get_payment_metrics(
     school_id: int,
     session_id: str,
     student_id: Optional[str] = None
 ):
+
+    student_part = student_id or "all"
+    cache_key = f"payments:{school_id}:{session_id}:{student_part}"
+
+    cached = get_cache(cache_key)
+    if cached is not None:
+        logger.info("CACHE HIT: payments")
+        return cached
+
+    logger.info("CACHE MISS: payments")
 
     query = (
         supabase
@@ -112,16 +153,20 @@ def get_payment_metrics(
 
     outstanding_amount = total_due - total_paid
 
-    return {
+    result = {
         "total_due": total_due,
         "total_paid": total_paid,
         "outstanding_amount": outstanding_amount,
         "records_found": len(data)
     }
 
+    set_cache(cache_key, result)
+
+    return result
 
 
 # PERFORMANCE
+
 
 def _fetch_submitted_performance_records(
     school_id: int,
@@ -134,7 +179,7 @@ def _fetch_submitted_performance_records(
         supabase
         .table("student_term_results")
         .select("average_total")
-        .eq("tenant_id", school_id)   # FIXED
+        .eq("tenant_id", school_id)
         .eq("session_id", session_id)
         .eq("term_id", term_id)
     )
@@ -154,6 +199,16 @@ def get_performance_metrics(
     student_id: Optional[str] = None
 ):
 
+    student_part = student_id or "all"
+    cache_key = f"performance:{school_id}:{session_id}:{term_id}:{student_part}"
+
+    cached = get_cache(cache_key)
+    if cached is not None:
+        logger.info("CACHE HIT: performance")
+        return cached
+
+    logger.info("CACHE MISS: performance")
+
     records = _fetch_submitted_performance_records(
         school_id,
         session_id,
@@ -162,12 +217,14 @@ def get_performance_metrics(
     )
 
     if not records:
-        return {
+        result = {
             "average_score": None,
             "records_used": 0,
             "highest_score": None,
             "lowest_score": None
         }
+        set_cache(cache_key, result)
+        return result
 
     scores = [
         r.get("average_total")
@@ -176,23 +233,28 @@ def get_performance_metrics(
     ]
 
     if not scores:
-        return {
+        result = {
             "average_score": None,
             "records_used": 0,
             "highest_score": None,
             "lowest_score": None
         }
+        set_cache(cache_key, result)
+        return result
 
     average_score = compute_average(scores)
     high_low = compute_high_low(scores)
 
-    return {
+    result = {
         "average_score": average_score,
         "records_used": len(scores),
         "highest_score": high_low["highest"],
         "lowest_score": high_low["lowest"]
     }
 
+    set_cache(cache_key, result)
+
+    return result
 
 
 # PREVIOUS TERM PERFORMANCE
@@ -203,6 +265,15 @@ def get_previous_term_performance(
     session_id: str,
     term_id: str
 ):
+
+    cache_key = f"previous_performance:{school_id}:{session_id}:{term_id}"
+
+    cached = get_cache(cache_key)
+    if cached is not None:
+        logger.info("CACHE HIT: previous_performance")
+        return cached
+
+    logger.info("CACHE MISS: previous_performance")
 
     try:
         previous_term = str(int(term_id) - 1)
@@ -216,7 +287,7 @@ def get_previous_term_performance(
         supabase
         .table("student_term_results")
         .select("average_total")
-        .eq("tenant_id", school_id)   
+        .eq("tenant_id", school_id)
         .eq("session_id", session_id)
         .eq("term_id", previous_term)
     )
@@ -234,4 +305,8 @@ def get_previous_term_performance(
     if not scores:
         return None
 
-    return compute_average(scores)
+    result = compute_average(scores)
+
+    set_cache(cache_key, result)
+
+    return result

@@ -4,3 +4,4 @@ INTENT_ACCESS = {
     "payments": ["owner", "admin"],
     "performance": ["owner", "admin", "teacher"],
 }
+

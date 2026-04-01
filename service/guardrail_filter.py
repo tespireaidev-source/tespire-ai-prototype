@@ -1,6 +1,12 @@
 from typing import Optional
 
 
+class GuardrailResult:
+    def __init__(self, allowed: bool, message: Optional[str] = None):
+        self.allowed = allowed
+        self.message = message
+
+
 PROMPT_INJECTION_KEYWORDS = [
     "ignore permissions",
     "bypass permissions",
@@ -35,24 +41,36 @@ VAGUE_PROMPTS = [
 ]
 
 
-def evaluate_guardrails(question: str) -> Optional[str]:
+def evaluate_guardrails(question: str) -> GuardrailResult:
 
-    q = question.lower().strip()
+    q = (question or "").lower().strip()
 
     # Prompt injection protection
     if any(k in q for k in PROMPT_INJECTION_KEYWORDS):
-        return "I can't perform actions that bypass system permissions."
+        return GuardrailResult(
+            allowed=False,
+            message="I can't perform actions that bypass system permissions."
+        )
 
     # Raw data exposure protection
     if any(k in q for k in RAW_DATA_KEYWORDS):
-        return "I can summarise insights but can't expose raw database records."
+        return GuardrailResult(
+            allowed=False,
+            message="I can summarise insights but can't expose raw database records."
+        )
 
     # Prediction blocking
     if any(k in q for k in PREDICTION_KEYWORDS):
-        return "I can’t predict future outcomes. I can summarise past or current school data."
+        return GuardrailResult(
+            allowed=False,
+            message="I can’t predict future outcomes. I can summarise past or current school data."
+        )
 
     # Clarification prompts
-    if q in VAGUE_PROMPTS:
-        return "You can ask about enrolment, attendance, fees, or academic performance."
+    if any(q == v or v in q for v in VAGUE_PROMPTS):
+        return GuardrailResult(
+            allowed=False,
+            message="You can ask about enrolment, attendance, fees, or academic performance."
+        )
 
-    return None
+    return GuardrailResult(allowed=True)

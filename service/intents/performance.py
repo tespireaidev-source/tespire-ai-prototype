@@ -7,9 +7,12 @@ from service.trend_utils import compute_trend
 from service.data_completeness import check_data_completeness
 from service.expected_records import get_expected_performance_records
 
+from service.report_resolver import get_authoritative_performance
+
 
 def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResult:
 
+    # Derived metrics
     metrics = get_performance_metrics(
         school_id=scope.school_id,
         session_id=period.session_id,
@@ -17,9 +20,23 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
         student_id=scope.student_id
     )
 
-    avg = metrics.get("average_score")
+    # Report authority
+    authoritative = get_authoritative_performance(
+        scope.school_id,
+        period.session_id,
+        period.term_id
+    )
+
+    if authoritative:
+        avg = authoritative["average_score"]
+        source = "official_report"
+    else:
+        avg = metrics.get("average_score")
+        source = "derived"
+
     records = metrics.get("records_used", 0)
 
+    # Missing data
     if avg is None:
         return IntentResult(
             answer="Verified performance data is unavailable for this period.",
@@ -34,21 +51,20 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
             suggested_actions=["Verify academic performance data source"]
         )
 
-    # DATA COMPLETENESS CHECK 
+    # Data completeness
     expected_records = get_expected_performance_records(
-       scope.school_id,
-       period.session_id,
-       period.term_id
+        scope.school_id,
+        period.session_id,
+        period.term_id
     )
 
     completeness = check_data_completeness(records, expected_records)
 
     data_gap_message = None
-
     if completeness and completeness["status"] == "incomplete":
         data_gap_message = completeness["message"]
 
-    # TREND ANALYSIS 
+    # Trend analysis
     previous_avg = get_previous_term_performance(
         scope.school_id,
         period.session_id,
@@ -67,7 +83,7 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
         else:
             trend_text = " Performance remained stable compared to the previous term."
 
-    # CHILD LEVEL RESPONSE 
+    # Response
     if scope.student_id:
 
         student_name = get_student_full_name(scope.student_id)
@@ -83,12 +99,14 @@ def handle_performance(scope: AccessScope, period: ResolvedPeriod) -> IntentResu
                 f"is {avg}% based on {records} academic records.{trend_text}"
             )
 
-    # SCHOOL LEVEL RESPONSE
     else:
         answer = (
             f"The overall average performance score for {period.label} "
             f"is {avg}% based on {records} academic records.{trend_text}"
         )
+
+    # Transparency 
+    metrics["source"] = source
 
     return IntentResult(
         answer=answer,
